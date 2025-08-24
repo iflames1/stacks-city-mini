@@ -1,5 +1,5 @@
 
-;; @title Bonding Curve Token for STX.City Mini
+;; @title Bonding Curve Token for STX.CITY Mini Version
 ;; @version 1.0
 ;; @summary A SIP-010 compliant fungible token for memecoin launches
 ;; @description This contract implements a fungible token that can be traded on bonding curves

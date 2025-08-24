@@ -1,5 +1,5 @@
 
-;; @title Bonding Curve DEX for STX.City Mini
+;; @title Bonding Curve DEX for STX.CITY Mini Version
 ;; @version 1.0
 ;; @summary A decentralized exchange facilitating token trading using bonding curve mechanism
 ;; @description This DEX allows users to buy and sell tokens through a bonding curve, with automatic liquidity provision
@@ -26,7 +26,7 @@
 (define-constant VIRTUAL_STX_VALUE u600000000)  ;; 600 STX virtual liquidity
 (define-constant COMPLETE_FEE u60000000)        ;; 60 STX completion fee
 
-;; Fee wallets (using deployer for simplicity in mini version)
+;; Fee wallets
 (define-constant PLATFORM_FEE_WALLET tx-sender)
 (define-constant DEPLOYER_WALLET tx-sender)
 
@@ -88,7 +88,7 @@
 			(var-set stx-balance new-stx-balance)
 			(var-set token-balance new-token-balance)
 
-			;; Check if target reached (simplified - no auto-listing in mini version)
+			;; Check if target reached (simplified - no auto-listing)
 			(if (>= new-stx-balance STX_TARGET_AMOUNT)
 			(begin
 				(var-set tradable false)
