@@ -1,12 +1,21 @@
 [project]
-name = "contract"
-description = ""
+name = 'contract'
+description = ''
 authors = []
 telemetry = true
 cache_dir = './.cache'
-requirements = []
 
-[contracts]
+[[project.requirements]]
+contract_id = 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard'
+[contracts.dex]
+path = 'contracts/dex.clar'
+clarity_version = 3
+epoch = 3.0
+
+[contracts.token]
+path = 'contracts/token.clar'
+clarity_version = 3
+epoch = 3.0
 [repl.analysis]
 passes = ['check_checker']
 
