@@ -4,14 +4,14 @@
 ;; @summary A SIP-010 compliant fungible token for memecoin launches
 ;; @description This contract implements a fungible token that can be traded on bonding curves
 
-;; Implement the SIP-010 trait
-(impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
-
 ;; Error constants
 (define-constant ERR-UNAUTHORIZED u401)
 (define-constant ERR-NOT-OWNER u402)
 (define-constant ERR-INVALID-PARAMETERS u403)
 (define-constant ERR-NOT-ENOUGH-FUND u101)
+
+;; Implement the SIP-010 trait
+(impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
 
 ;; Token constants
 (define-constant MAXSUPPLY u100000000000000) ;; 100M tokens with 6 decimals
@@ -21,24 +21,23 @@
 
 ;; Data variables
 (define-data-var contract-owner principal tx-sender)
-(define-data-var token-name (string-ascii 32) "Mini Token")
-(define-data-var token-symbol (string-ascii 10) "MINI")
 (define-data-var token-uri (optional (string-utf8 256)) none)
 
 ;; SIP-010 Functions
 (define-public (transfer (amount uint) (from principal) (to principal) (memo (optional (buff 34))))
     (begin
         (asserts! (is-eq from tx-sender) (err ERR-UNAUTHORIZED))
-        (ft-transfer? MINI-TOKEN amount from to)
+        (try! (ft-transfer? MINI-TOKEN amount from to))
+        (ok true)
     )
 )
 
 (define-read-only (get-name)
-	(ok (var-get token-name))
+	(ok "Mini Token")
 )
 
 (define-read-only (get-symbol)
-	(ok (var-get token-symbol))
+	(ok "MINI")
 )
 
 (define-read-only (get-decimals)
@@ -73,22 +72,6 @@
     )
 )
 
-(define-public (set-name (new-name (string-ascii 32)))
-	(begin
-		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-NOT-OWNER))
-		(var-set token-name new-name)
-		(ok true)
-	)
-)
-
-(define-public (set-symbol (new-symbol (string-ascii 10)))
-	(begin
-		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-NOT-OWNER))
-		(var-set token-symbol new-symbol)
-		(ok true)
-	)
-)
-
 (define-public (transfer-ownership (new-owner principal))
 	(begin
 		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-NOT-OWNER))
@@ -120,7 +103,16 @@
 (define-public (mint (amount uint) (recipient principal))
 	(begin
 		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-UNAUTHORIZED))
-		(ft-mint? MINI-TOKEN amount recipient)
+		(try! (ft-mint? MINI-TOKEN amount recipient))
+		(ok true)
 	)
+)
+
+;; ---------------------------------------------------------
+;; Top-level initialization - auto-mint tokens on deployment
+;; ---------------------------------------------------------
+(begin
+    ;; Mint all tokens to the deployer initially
+    (try! (ft-mint? MINI-TOKEN u100000000000000 tx-sender))
 )
 

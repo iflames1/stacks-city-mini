@@ -15,6 +15,18 @@ export interface DeployedToken {
 	progress?: number;
 }
 
+export interface IncompleteDeployment {
+	id: string;
+	name: string;
+	symbol: string;
+	description: string;
+	tokenContract: string;
+	tokenTxId: string;
+	deployedBy: string;
+	createdAt: number;
+	step: "token-deployed" | "awaiting-dex";
+}
+
 export interface WalletState {
 	isConnected: boolean;
 	address?: string;

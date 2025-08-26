@@ -8,14 +8,14 @@ export const getTokenContract = (name: string, symbol: string): string => {
 ;; @summary A SIP-010 compliant fungible token for memecoin launches
 ;; @description This contract implements a fungible token that can be traded on bonding curves
 
-;; Implement the SIP-010 trait
-(impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
-
 ;; Error constants
 (define-constant ERR-UNAUTHORIZED u401)
 (define-constant ERR-NOT-OWNER u402)
 (define-constant ERR-INVALID-PARAMETERS u403)
 (define-constant ERR-NOT-ENOUGH-FUND u101)
+
+;; Implement the SIP-010 trait
+(impl-trait 'STF0V8KWBS70F0WDKTMY65B3G591NN52PR4Z71Y3.sip-010-trait-ft-standard.sip-010-trait)
 
 ;; Token constants
 (define-constant MAXSUPPLY u100000000000000) ;; 100M tokens with 6 decimals
@@ -25,24 +25,27 @@ export const getTokenContract = (name: string, symbol: string): string => {
 
 ;; Data variables
 (define-data-var contract-owner principal tx-sender)
-(define-data-var token-name (string-ascii 32) "${name}")
-(define-data-var token-symbol (string-ascii 10) "${symbol.toUpperCase()}")
 (define-data-var token-uri (optional (string-utf8 256)) none)
 
 ;; SIP-010 Functions
 (define-public (transfer (amount uint) (from principal) (to principal) (memo (optional (buff 34))))
     (begin
         (asserts! (is-eq from tx-sender) (err ERR-UNAUTHORIZED))
-        (ft-transfer? ${symbol.toUpperCase()}-TOKEN amount from to)
+        (try! (ft-transfer? ${symbol.toUpperCase()}-TOKEN amount from to))
+        (ok true)
     )
 )
 
+(define-read-only (get-balance (owner principal))
+	(ok (ft-get-balance ${symbol.toUpperCase()}-TOKEN owner))
+)
+
 (define-read-only (get-name)
-	(ok (var-get token-name))
+	(ok "${name}")
 )
 
 (define-read-only (get-symbol)
-	(ok (var-get token-symbol))
+	(ok "${symbol.toUpperCase()}")
 )
 
 (define-read-only (get-decimals)
@@ -51,10 +54,6 @@ export const getTokenContract = (name: string, symbol: string): string => {
 
 (define-read-only (get-total-supply)
 	(ok (ft-get-supply ${symbol.toUpperCase()}-TOKEN))
-)
-
-(define-read-only (get-balance (owner principal))
-	(ok (ft-get-balance ${symbol.toUpperCase()}-TOKEN owner))
 )
 
 (define-read-only (get-token-uri)
@@ -75,22 +74,6 @@ export const getTokenContract = (name: string, symbol: string): string => {
             })
         )
     )
-)
-
-(define-public (set-name (new-name (string-ascii 32)))
-	(begin
-		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-NOT-OWNER))
-		(var-set token-name new-name)
-		(ok true)
-	)
-)
-
-(define-public (set-symbol (new-symbol (string-ascii 10)))
-	(begin
-		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-NOT-OWNER))
-		(var-set token-symbol new-symbol)
-		(ok true)
-	)
 )
 
 (define-public (transfer-ownership (new-owner principal))
@@ -124,8 +107,17 @@ export const getTokenContract = (name: string, symbol: string): string => {
 (define-public (mint (amount uint) (recipient principal))
 	(begin
 		(asserts! (is-eq tx-sender (var-get contract-owner)) (err ERR-UNAUTHORIZED))
-		(ft-mint? ${symbol.toUpperCase()}-TOKEN amount recipient)
+		(try! (ft-mint? ${symbol.toUpperCase()}-TOKEN amount recipient))
+		(ok true)
 	)
+)
+
+;; ---------------------------------------------------------
+;; Top-level initialization - auto-mint tokens on deployment
+;; ---------------------------------------------------------
+(begin
+    ;; Mint all tokens to the deployer initially
+    (try! (ft-mint? ${symbol.toUpperCase()}-TOKEN u100000000000000 tx-sender))
 )
 `;
 };
@@ -138,7 +130,7 @@ export const getDexContract = (): string => {
 ;; @description This DEX allows users to buy and sell tokens through a bonding curve, with automatic liquidity provision
 
 ;; Import SIP-010 trait
-(use-trait sip-010-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
+(use-trait sip-010-trait 'STF0V8KWBS70F0WDKTMY65B3G591NN52PR4Z71Y3.sip-010-trait-ft-standard.sip-010-trait)
 
 ;; Error constants
 (define-constant ERR-UNAUTHORIZED (err u401))

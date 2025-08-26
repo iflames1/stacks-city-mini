@@ -88,7 +88,9 @@ export const deployTokenContract = async (
 	}
 };
 
-export const deployDexContract = async (tokenName: string): Promise<{ contractId: string; txId: string }> => {
+export const deployDexContract = async (
+	tokenName: string
+): Promise<{ contractId: string; txId: string }> => {
 	const userData = getUserData();
 	if (!userData) throw new Error("No wallet connected");
 
@@ -145,6 +147,34 @@ export const initializeDex = async (
 		return response.txid || "";
 	} catch (error) {
 		console.error("Failed to initialize DEX:", error);
+		throw error;
+	}
+};
+
+export const transferTokens = async (
+	tokenContract: string,
+	amount: number,
+	recipient: string
+): Promise<string> => {
+	const userData = getUserData();
+	if (!userData) throw new Error("No wallet connected");
+
+	try {
+		const response = await request("stx_callContract", {
+			contract: tokenContract as `${string}.${string}`,
+			functionName: "transfer",
+			functionArgs: [
+				Cl.uint(amount),
+				Cl.principal(userData.profile.stxAddress.testnet),
+				Cl.principal(recipient),
+				Cl.none(),
+			],
+			network: "testnet",
+		});
+
+		return response.txid || "";
+	} catch (error) {
+		console.error("Failed to transfer tokens:", error);
 		throw error;
 	}
 };
