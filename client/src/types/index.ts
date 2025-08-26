@@ -22,9 +22,16 @@ export interface IncompleteDeployment {
 	description: string;
 	tokenContract: string;
 	tokenTxId: string;
+	dexContract?: string;
+	dexTxId?: string;
+	initTxId?: string;
 	deployedBy: string;
 	createdAt: number;
-	step: "token-deployed" | "awaiting-dex";
+	step:
+		| "token-deployed"
+		| "dex-deployed"
+		| "dex-initialized"
+		| "awaiting-transfer";
 }
 
 export interface WalletState {

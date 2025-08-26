@@ -5,7 +5,7 @@ import {
 	getLocalStorage,
 	request,
 } from "@stacks/connect";
-import { Cl } from "@stacks/transactions";
+import { Cl, FungiblePostCondition } from "@stacks/transactions";
 import { BondingCurveData } from "@/types";
 import { getTokenContract, getDexContract } from "./contracts";
 
@@ -160,6 +160,21 @@ export const transferTokens = async (
 	if (!userData) throw new Error("No wallet connected");
 
 	try {
+		// Extract contract info for asset identifier
+		const [contractAddress, contractName] = tokenContract.split(".");
+		const tokenSymbol = contractName.replace("-token", "").toUpperCase();
+
+		// Create post-condition to ensure we send exactly the specified amount
+		const postConditions: FungiblePostCondition[] = [
+			{
+				type: "ft-postcondition",
+				address: userData.profile.stxAddress.testnet,
+				condition: "eq",
+				asset: `${contractAddress}.${contractName}::${tokenSymbol}-TOKEN` as `${string}.${string}::${string}`,
+				amount: amount,
+			},
+		];
+
 		const response = await request("stx_callContract", {
 			contract: tokenContract as `${string}.${string}`,
 			functionName: "transfer",
@@ -169,6 +184,7 @@ export const transferTokens = async (
 				Cl.principal(recipient),
 				Cl.none(),
 			],
+			postConditions,
 			network: "testnet",
 		});
 

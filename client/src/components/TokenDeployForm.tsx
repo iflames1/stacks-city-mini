@@ -105,43 +105,73 @@ export default function TokenDeployForm({
 		setTxState({ loading: true, error: undefined });
 
 		try {
-			// Deploy DEX contract
-			console.log("🚀 Continuing deployment - deploying DEX contract...");
-			setTxState({ loading: true, message: "Deploying DEX contract..." });
-			const dexResult = await deployDexContract(
-				incompleteDeployment.symbol
-			);
-
-			console.log("⏳ Waiting for DEX contract confirmation...");
-			setTxState({
-				loading: true,
-				message: "Waiting for DEX contract confirmation...",
-			});
-			await waitForTxConfirmed(dexResult.txId);
-
-			// Initialize DEX contract with token and liquidity
-			console.log("🔧 Initializing DEX with token and liquidity...");
-			setTxState({
-				loading: true,
-				message: "Initializing DEX with token and liquidity...",
-			});
+			let dexResult: { contractId: string; txId: string };
 			const initTokenAmount = 90000000000000; // 90M tokens to DEX (90% of supply)
 			const initStxAmount = 0; // Start with 0 STX
-			const initTxId = await initializeDex(
-				dexResult.contractId,
-				incompleteDeployment.tokenContract,
-				initTokenAmount,
-				initStxAmount
-			);
 
-			console.log("⏳ Waiting for DEX initialization confirmation...");
-			setTxState({
-				loading: true,
-				message: "Waiting for DEX initialization confirmation...",
-			});
-			await waitForTxConfirmed(initTxId);
+			// Step 1: Deploy DEX if needed
+			if (incompleteDeployment.step === "token-deployed") {
+				console.log(
+					"🚀 Continuing deployment - deploying DEX contract..."
+				);
+				setTxState({
+					loading: true,
+					message: "Deploying DEX contract...",
+				});
+				dexResult = await deployDexContract(
+					incompleteDeployment.symbol
+				);
 
-			// Transfer tokens to DEX contract for trading
+				console.log("⏳ Waiting for DEX contract confirmation...");
+				setTxState({
+					loading: true,
+					message: "Waiting for DEX contract confirmation...",
+				});
+				await waitForTxConfirmed(dexResult.txId);
+
+				// Update incomplete deployment with DEX info
+				incompleteDeployment.dexContract = dexResult.contractId;
+				incompleteDeployment.dexTxId = dexResult.txId;
+				incompleteDeployment.step = "dex-deployed";
+				await dbManager.saveIncompleteDeployment(incompleteDeployment);
+			} else {
+				// DEX already deployed, use existing info
+				dexResult = {
+					contractId: incompleteDeployment.dexContract!,
+					txId: incompleteDeployment.dexTxId!,
+				};
+			}
+
+			// Step 2: Initialize DEX if needed
+			if (incompleteDeployment.step === "dex-deployed") {
+				console.log("🔧 Initializing DEX with token and liquidity...");
+				setTxState({
+					loading: true,
+					message: "Initializing DEX with token and liquidity...",
+				});
+				const initTxId = await initializeDex(
+					dexResult.contractId,
+					incompleteDeployment.tokenContract,
+					initTokenAmount,
+					initStxAmount
+				);
+
+				console.log(
+					"⏳ Waiting for DEX initialization confirmation..."
+				);
+				setTxState({
+					loading: true,
+					message: "Waiting for DEX initialization confirmation...",
+				});
+				await waitForTxConfirmed(initTxId);
+
+				// Update incomplete deployment with initialization info
+				incompleteDeployment.initTxId = initTxId;
+				incompleteDeployment.step = "dex-initialized";
+				await dbManager.saveIncompleteDeployment(incompleteDeployment);
+			}
+
+			// Step 3: Transfer tokens to DEX
 			console.log("💰 Transferring tokens to DEX contract...");
 			setTxState({
 				loading: true,
@@ -150,7 +180,7 @@ export default function TokenDeployForm({
 			const transferTxId = await transferTokens(
 				incompleteDeployment.tokenContract,
 				initTokenAmount,
-				dexResult.contractId.split(".")[0] // DEX contract address
+				dexResult.contractId // Full DEX contract ID
 			);
 
 			console.log("⏳ Waiting for token transfer confirmation...");
@@ -277,6 +307,13 @@ export default function TokenDeployForm({
 			});
 			await waitForTxConfirmed(dexResult.txId);
 
+			// Update incomplete deployment with DEX info
+			console.log("💾 Updating deployment progress - DEX deployed...");
+			incompleteDeployment.dexContract = dexResult.contractId;
+			incompleteDeployment.dexTxId = dexResult.txId;
+			incompleteDeployment.step = "dex-deployed";
+			await dbManager.saveIncompleteDeployment(incompleteDeployment);
+
 			// Initialize DEX contract with token and liquidity
 			console.log("🔧 Initializing DEX with token and liquidity...");
 			setTxState({
@@ -299,6 +336,12 @@ export default function TokenDeployForm({
 			});
 			await waitForTxConfirmed(initTxId);
 
+			// Update incomplete deployment with initialization info
+			console.log("💾 Updating deployment progress - DEX initialized...");
+			incompleteDeployment.initTxId = initTxId;
+			incompleteDeployment.step = "dex-initialized";
+			await dbManager.saveIncompleteDeployment(incompleteDeployment);
+
 			// Transfer tokens to DEX contract for trading
 			console.log("💰 Transferring tokens to DEX contract...");
 			setTxState({
@@ -308,7 +351,7 @@ export default function TokenDeployForm({
 			const transferTxId = await transferTokens(
 				tokenResult.contractId,
 				initTokenAmount,
-				dexResult.contractId.split(".")[0] // DEX contract address
+				dexResult.contractId // Full DEX contract ID
 			);
 
 			console.log("⏳ Waiting for token transfer confirmation...");
@@ -407,8 +450,13 @@ export default function TokenDeployForm({
 										{deployment.name} ({deployment.symbol})
 									</h4>
 									<p className="text-sm text-muted-foreground">
-										Token contract deployed, DEX contract
-										pending
+										{deployment.step === "token-deployed" &&
+											"Token deployed, need DEX deployment"}
+										{deployment.step === "dex-deployed" &&
+											"DEX deployed, need initialization"}
+										{deployment.step ===
+											"dex-initialized" &&
+											"DEX initialized, need token transfer"}
 									</p>
 								</div>
 								<Button
