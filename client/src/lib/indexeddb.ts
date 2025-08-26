@@ -1,8 +1,9 @@
-import { DeployedToken } from "@/types";
+import { DeployedToken, IncompleteDeployment } from "@/types";
 
 const DB_NAME = "stx-city-mini";
-const DB_VERSION = 1;
-const STORE_NAME = "tokens";
+const DB_VERSION = 2;
+const TOKENS_STORE = "tokens";
+const INCOMPLETE_STORE = "incomplete_deployments";
 
 class IndexedDBManager {
 	private db: IDBDatabase | null = null;
@@ -19,14 +20,32 @@ class IndexedDBManager {
 
 			request.onupgradeneeded = () => {
 				const db = request.result;
-				if (!db.objectStoreNames.contains(STORE_NAME)) {
-					const store = db.createObjectStore(STORE_NAME, {
+
+				// Create tokens store
+				if (!db.objectStoreNames.contains(TOKENS_STORE)) {
+					const store = db.createObjectStore(TOKENS_STORE, {
 						keyPath: "id",
 					});
 					store.createIndex("deployedBy", "deployedBy", {
 						unique: false,
 					});
 					store.createIndex("deployedAt", "deployedAt", {
+						unique: false,
+					});
+				}
+
+				// Create incomplete deployments store
+				if (!db.objectStoreNames.contains(INCOMPLETE_STORE)) {
+					const incompleteStore = db.createObjectStore(
+						INCOMPLETE_STORE,
+						{
+							keyPath: "id",
+						}
+					);
+					incompleteStore.createIndex("deployedBy", "deployedBy", {
+						unique: false,
+					});
+					incompleteStore.createIndex("createdAt", "createdAt", {
 						unique: false,
 					});
 				}
@@ -38,8 +57,11 @@ class IndexedDBManager {
 		if (!this.db) await this.init();
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
-			const store = transaction.objectStore(STORE_NAME);
+			const transaction = this.db!.transaction(
+				[TOKENS_STORE],
+				"readwrite"
+			);
+			const store = transaction.objectStore(TOKENS_STORE);
 			const request = store.put(token);
 
 			request.onerror = () => reject(request.error);
@@ -51,8 +73,11 @@ class IndexedDBManager {
 		if (!this.db) await this.init();
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readonly");
-			const store = transaction.objectStore(STORE_NAME);
+			const transaction = this.db!.transaction(
+				[TOKENS_STORE],
+				"readonly"
+			);
+			const store = transaction.objectStore(TOKENS_STORE);
 			const index = store.index("deployedBy");
 			const request = index.getAll(ownerAddress);
 
@@ -65,8 +90,11 @@ class IndexedDBManager {
 		if (!this.db) await this.init();
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readonly");
-			const store = transaction.objectStore(STORE_NAME);
+			const transaction = this.db!.transaction(
+				[TOKENS_STORE],
+				"readonly"
+			);
+			const store = transaction.objectStore(TOKENS_STORE);
 			const request = store.getAll();
 
 			request.onerror = () => reject(request.error);
@@ -81,8 +109,11 @@ class IndexedDBManager {
 		if (!this.db) await this.init();
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
-			const store = transaction.objectStore(STORE_NAME);
+			const transaction = this.db!.transaction(
+				[TOKENS_STORE],
+				"readwrite"
+			);
+			const store = transaction.objectStore(TOKENS_STORE);
 			const getRequest = store.get(tokenId);
 
 			getRequest.onsuccess = () => {
@@ -105,9 +136,66 @@ class IndexedDBManager {
 		if (!this.db) await this.init();
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction([STORE_NAME], "readwrite");
-			const store = transaction.objectStore(STORE_NAME);
+			const transaction = this.db!.transaction(
+				[TOKENS_STORE],
+				"readwrite"
+			);
+			const store = transaction.objectStore(TOKENS_STORE);
 			const request = store.delete(tokenId);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	}
+
+	// Incomplete deployment methods
+	async saveIncompleteDeployment(
+		deployment: IncompleteDeployment
+	): Promise<void> {
+		if (!this.db) await this.init();
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction(
+				[INCOMPLETE_STORE],
+				"readwrite"
+			);
+			const store = transaction.objectStore(INCOMPLETE_STORE);
+			const request = store.put(deployment);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	}
+
+	async getIncompleteDeploymentsByOwner(
+		ownerAddress: string
+	): Promise<IncompleteDeployment[]> {
+		if (!this.db) await this.init();
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction(
+				[INCOMPLETE_STORE],
+				"readonly"
+			);
+			const store = transaction.objectStore(INCOMPLETE_STORE);
+			const index = store.index("deployedBy");
+			const request = index.getAll(ownerAddress);
+
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve(request.result || []);
+		});
+	}
+
+	async deleteIncompleteDeployment(deploymentId: string): Promise<void> {
+		if (!this.db) await this.init();
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction(
+				[INCOMPLETE_STORE],
+				"readwrite"
+			);
+			const store = transaction.objectStore(INCOMPLETE_STORE);
+			const request = store.delete(deploymentId);
 
 			request.onerror = () => reject(request.error);
 			request.onsuccess = () => resolve();

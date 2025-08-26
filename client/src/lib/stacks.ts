@@ -5,7 +5,7 @@ import {
 	getLocalStorage,
 	request,
 } from "@stacks/connect";
-import { Cl } from "@stacks/transactions";
+import { Cl, FungiblePostCondition } from "@stacks/transactions";
 import { BondingCurveData } from "@/types";
 import { getTokenContract, getDexContract } from "./contracts";
 
@@ -88,7 +88,9 @@ export const deployTokenContract = async (
 	}
 };
 
-export const deployDexContract = async (tokenName: string): Promise<{ contractId: string; txId: string }> => {
+export const deployDexContract = async (
+	tokenName: string
+): Promise<{ contractId: string; txId: string }> => {
 	const userData = getUserData();
 	if (!userData) throw new Error("No wallet connected");
 
@@ -149,6 +151,50 @@ export const initializeDex = async (
 	}
 };
 
+export const transferTokens = async (
+	tokenContract: string,
+	amount: number,
+	recipient: string
+): Promise<string> => {
+	const userData = getUserData();
+	if (!userData) throw new Error("No wallet connected");
+
+	try {
+		// Extract contract info for asset identifier
+		const [contractAddress, contractName] = tokenContract.split(".");
+		const tokenSymbol = contractName.replace("-token", "").toUpperCase();
+
+		// Create post-condition to ensure we send exactly the specified amount
+		const postConditions: FungiblePostCondition[] = [
+			{
+				type: "ft-postcondition",
+				address: userData.profile.stxAddress.testnet,
+				condition: "eq",
+				asset: `${contractAddress}.${contractName}::${tokenSymbol}-TOKEN` as `${string}.${string}::${string}`,
+				amount: amount,
+			},
+		];
+
+		const response = await request("stx_callContract", {
+			contract: tokenContract as `${string}.${string}`,
+			functionName: "transfer",
+			functionArgs: [
+				Cl.uint(amount),
+				Cl.principal(userData.profile.stxAddress.testnet),
+				Cl.principal(recipient),
+				Cl.none(),
+			],
+			postConditions,
+			network: "testnet",
+		});
+
+		return response.txid || "";
+	} catch (error) {
+		console.error("Failed to transfer tokens:", error);
+		throw error;
+	}
+};
+
 export const buyTokens = async (
 	dexContract: string,
 	tokenContract: string,
@@ -158,6 +204,29 @@ export const buyTokens = async (
 	if (!userData) throw new Error("No wallet connected");
 
 	try {
+		// Extract contract info for asset identifier
+		const [contractAddress, contractName] = tokenContract.split(".");
+		const tokenSymbol = contractName.replace("-token", "").toUpperCase();
+
+		// Create post-conditions for secure buying
+		const postConditions = [
+			// STX post-condition: ensure we spend exactly the specified amount
+			{
+				type: "stx-postcondition" as const,
+				address: userData.profile.stxAddress.testnet,
+				condition: "eq" as const,
+				amount: stxAmount,
+			},
+			// Token post-condition: ensure we receive tokens (at least 1 token)
+			{
+				type: "ft-postcondition" as const,
+				address: userData.profile.stxAddress.testnet,
+				condition: "gte" as const,
+				asset: `${contractAddress}.${contractName}::${tokenSymbol}-TOKEN` as `${string}.${string}::${string}`,
+				amount: 1,
+			},
+		];
+
 		const response = await request("stx_callContract", {
 			contract: dexContract as `${string}.${string}`,
 			functionName: "buy",
@@ -168,6 +237,7 @@ export const buyTokens = async (
 				),
 				Cl.uint(stxAmount),
 			],
+			postConditions,
 			network: "testnet",
 		});
 
@@ -187,6 +257,29 @@ export const sellTokens = async (
 	if (!userData) throw new Error("No wallet connected");
 
 	try {
+		// Extract contract info for asset identifier
+		const [contractAddress, contractName] = tokenContract.split(".");
+		const tokenSymbol = contractName.replace("-token", "").toUpperCase();
+
+		// Create post-conditions for secure selling
+		const postConditions = [
+			// Token post-condition: ensure we send exactly the specified amount
+			{
+				type: "ft-postcondition" as const,
+				address: userData.profile.stxAddress.testnet,
+				condition: "eq" as const,
+				asset: `${contractAddress}.${contractName}::${tokenSymbol}-TOKEN` as `${string}.${string}::${string}`,
+				amount: tokenAmount,
+			},
+			// STX post-condition: ensure we receive STX (at least 1 micro-STX)
+			{
+				type: "stx-postcondition" as const,
+				address: userData.profile.stxAddress.testnet,
+				condition: "gte" as const,
+				amount: 1,
+			},
+		];
+
 		const response = await request("stx_callContract", {
 			contract: dexContract as `${string}.${string}`,
 			functionName: "sell",
@@ -197,6 +290,7 @@ export const sellTokens = async (
 				),
 				Cl.uint(tokenAmount),
 			],
+			postConditions,
 			network: "testnet",
 		});
 
